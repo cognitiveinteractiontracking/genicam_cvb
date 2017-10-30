@@ -1,0 +1,9 @@
+<launch>
+
+  <!--START THE TWB CAMERAS-->
+  <include file="$(find cvb)/launch/example.launch"><arg name="CAM" value="1" /></include>
+  <include file="$(find cvb)/launch/example.launch"><arg name="CAM" value="2" /></include>
+  <include file="$(find cvb)/launch/example.launch"><arg name="CAM" value="3" /></include>
+  <include file="$(find cvb)/launch/example.launch"><arg name="CAM" value="4" /></include>
+
+</launch>
