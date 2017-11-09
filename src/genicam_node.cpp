@@ -9,6 +9,9 @@
 #include <ros/console.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/distortion_models.h>
+#include <camera_info_manager/camera_info_manager.h>
 // #include <cv_bridge/cv_bridge.h>
 
 // Image from the camera
@@ -30,17 +33,10 @@ static int monoAsBayer = 0;
 static int gui = false;
 static int printFps = false;
 
-// calibrated
-static bool calibrated = false;
-static cv::Mat undistoredLookUpTableX;
-static cv::Mat undistoredLookUpTableY;
-static cv::Mat cameraMatrix;
-static cv::Mat distortionMatrix;
-static std::string calibration = "";
-static std::vector<std::pair<std::string, std::string>> cameraParamter;
-
 // Camera parameter
 static std::string cameraParamterPrefix;
+static std::vector<std::pair<std::string, std::string>> cameraParamter;
+static std::string rosCalbirationFile;
 
 // ROS send parameters
 static std::string topic;
@@ -48,15 +44,14 @@ static std::string frame_id;
 static int streamCounterRst = 1; // Send ever n'th image
 static int streamCounter = 1;
 static int expectedFps = 48;
-ros::Publisher publisher;
+ros::Publisher imagePublisher;
+ros::Publisher cameraInfoPublisher;
 sensor_msgs::Image msgImage;
+sensor_msgs::CameraInfo msgCameraInfo;
 cv::Mat img;
 
 static std::string driverpath = "";
 const std::string cvbDriverPath("/etc/opt/cvb/drivers/GenICam.ini");
-
-void initCalibration(std::string path);
-void rectifyImage(const cv::Mat& src, cv::Mat& dst);
 
 // FPS calculation
 int fpsCounter = 0;
@@ -110,9 +105,6 @@ int process() {
     } else {
         ROS_WARN_STREAM("Unsupported number of color channels '" << colorChannelsDst << "'for ROS image");
     }
-    if(calibrated) {
-      rectifyImage(*frameDst, frameDstRectified);
-    }
     if (streamCounter >= streamCounterRst) {
       ++fpsStreamCounter;
 
@@ -126,6 +118,7 @@ int process() {
       msgImage.width = IMGwidth;
       msgImage.is_bigendian = false;
       msgImage.header.stamp = ros::Time::now();
+      msgCameraInfo.header.stamp = msgImage.header.stamp;
       msgImage.data.resize(IMGheight * IMGwidth * frameDst->channels());
       msgImage.step = IMGwidth * frameDst->channels();
 //      for (int idx = 0; idx < IMGwidth * IMGheight; ++idx) {
@@ -134,7 +127,8 @@ int process() {
 //          memcpy(msgImage.data.data() + (yIdx * IMGwidth + xIdx), frameDst->data + idx, 1);
 //      }
       memcpy(msgImage.data.data(), frameDst->data, IMGheight * IMGwidth * frameDst->channels());
-      publisher.publish(msgImage);
+      imagePublisher.publish(msgImage);
+      cameraInfoPublisher.publish(msgCameraInfo);
 
       if (gui) {
         cv::imshow("Camera Output", frame);
@@ -209,23 +203,6 @@ inline float getTimeDiff(const std::chrono::high_resolution_clock::time_point &s
   return seconds;
 }
 
-
-void initCalibration(std::string path) {
-  calibrated = true;
-  cv::FileStorage fs(path, cv::FileStorage::READ);
-  fs.open(path, cv::FileStorage::READ);
-  fs["Camera_Matrix"] >> cameraMatrix;
-  fs["Distortion_Coefficients"] >> distortionMatrix;
-  ROS_INFO_STREAM("dist mat loaded: \n" << distortionMatrix);
-  ROS_INFO_STREAM("camera mat loaded: \n" << cameraMatrix);
-  fs.release();
-}
-
-inline void rectifyImage(const cv::Mat& src, cv::Mat& dst) {
-  cv::remap(src, dst, undistoredLookUpTableX, undistoredLookUpTableY,
-            cv::INTER_LINEAR);
-}
-
 void programOptions(ros::NodeHandle &n) {
 
   n.param<int>("stream_counter_reset", streamCounterRst, 0); // Process every n'th image
@@ -234,12 +211,12 @@ void programOptions(ros::NodeHandle &n) {
   n.param<int>("color_channels_src", colorChannelsSrc, 1); // Number of channels in the image (Needed by OpenCV)
   n.param<int>("color_channels_dst", colorChannelsDst, 3); // Number of channels to send via ROS
   n.param<int>("mono_as_bayer", monoAsBayer, 0); // Sends mono images as bayer pattern
-  n.param<std::string>("calibration", calibration, ""); // Calibration OpenCV-file
   n.param<int>("gui", gui, 0); // Show the rectified image by OpenCV
   n.param<int>("expected_fps", expectedFps, 1); // Expected FPS (Needed by gstreamer)
   n.param<std::string>("topic", topic, ""); // Topic to send the images
   n.param<std::string>("frame", frame_id, ""); // Frame id of the camera
   n.param<std::string>("camera_paramter_prefix", cameraParamterPrefix, "config"); // JSON Object with camera parameter
+  n.param<std::string>("ros_calibration", rosCalbirationFile, ""); // Path to ros calibration.yaml file
 
   // Load the parameter for the camera
   // Get the full namespace for the camera config
@@ -270,13 +247,14 @@ int main(int argc, char **argv) {
   programOptions(n);
 
   if (!monoAsBayer) {
-    publisher = n.advertise<sensor_msgs::Image>(topic, 2);
+    imagePublisher = n.advertise<sensor_msgs::Image>(topic, 2);
   } else if (monoAsBayer && colorChannelsSrc == 1 && colorChannelsDst == 1 ) {
-    publisher = n.advertise<sensor_msgs::Image>(topic + std::string("/bayer"), 2);
+    imagePublisher = n.advertise<sensor_msgs::Image>(topic + std::string("/bayer"), 2);
   } else {
     ROS_ERROR("(mono_as_bayer && color_channels_src == 1 && color_channels_dst == 1) || !monoAsBayer");
     return 1;
   }
+  cameraInfoPublisher = n.advertise<sensor_msgs::CameraInfo>("camera_info", 1);
 
   // Copy the driver
   ROS_INFO_STREAM("Copy " << driverpath << " to " << cvbDriverPath);
@@ -304,11 +282,11 @@ int main(int argc, char **argv) {
     // access camera config
     if (!genicam::set_camera_parameter(cameraParamter, hCamera)) {
       set_cam_params++;
-      ROS_INFO_STREAM("+++ Camera access Error! +++ with tried attempts:" << set_cam_params);
+      ROS_WARN_STREAM("+++ Camera access Error! +++ with tried attempts:" << set_cam_params);
       ReleaseObject(hCamera);
       usleep(1e6);
       if (set_cam_params == attempt_thresh) {
-        ROS_INFO("Attempts reached treshold: %d. Shutdown Node.", attempt_thresh);
+        ROS_WARN("Attempts reached treshold: %d. Shutdown Node.", attempt_thresh);
         exit(-1);
       }
     } else {
@@ -323,18 +301,6 @@ int main(int argc, char **argv) {
   frame.create(IMGheight, IMGwidth, CV_8UC(colorChannelsSrc));
   frameDstTmp.create(IMGheight, IMGwidth, CV_8UC(colorChannelsDst));
 
-    if (calibrated) {
-      cv::Size imgSize = frame.size();
-      ROS_INFO_STREAM(imgSize);
-      ROS_INFO_STREAM("bgr Type: " << frameDstTmp.type());
-      ROS_INFO_STREAM("frame Type: " << frame.type());
-      ROS_INFO_STREAM("distortionMatrix Type: " << distortionMatrix.type());
-      cv::initUndistortRectifyMap(cameraMatrix, distortionMatrix, cv::Mat(),
-                                cv::getOptimalNewCameraMatrix(cameraMatrix,
-                                    distortionMatrix, imgSize, 1, imgSize),
-                                imgSize, CV_32FC1, undistoredLookUpTableX,
-                                undistoredLookUpTableY);
-    }
   cvbres_t result = G2Grab(hCamera);
   if (result < 0) {
     ROS_ERROR_STREAM("Error starting G2Grab");
@@ -346,6 +312,21 @@ int main(int argc, char **argv) {
 
   // Get the start clock once
   timeStamp = std::chrono::high_resolution_clock::now();
+
+  //fill camera_info
+  if(!rosCalbirationFile.empty()) {
+    camera_info_manager::CameraInfoManager cameraInfoManager(n, ros::this_node::getName(), rosCalbirationFile);
+    msgCameraInfo = cameraInfoManager.getCameraInfo();
+  }
+  msgCameraInfo.header.frame_id = frame_id;
+  msgCameraInfo.height = (uint) IMGheight;
+  msgCameraInfo.width = (uint) IMGwidth;
+  msgCameraInfo.binning_x = genicam::read_int("BinningHorizontal", hCamera);
+  msgCameraInfo.binning_y = genicam::read_int("BinningVertical", hCamera);
+//  msgCameraInfo.roi.width = genicam::read_int("Width", hCamera);
+//  msgCameraInfo.roi.height = genicam::read_int("Height", hCamera);
+//  msgCameraInfo.roi.x_offset = genicam::read_int("OffsetX", hCamera);
+//  msgCameraInfo.roi.y_offset = genicam::read_int("OffsetY", hCamera);
 
   while (true) {
     if (processEverything() != 0) {

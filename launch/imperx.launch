@@ -7,13 +7,14 @@
 
   <node type="genicam_node" name="genicam_cam$(arg CAM)" pkg="cvb" respawn="false" output="screen">
     <param name="driverpath" value="$(find cvb)/driver/IPX-1M48-VC_$(arg CAM).ini" />
-    <param name="expected_fps" value="$(arg fps)" /> 
+    <param name="ros_calibration" value="file://$(find cvb)/calib/imperx_$(arg CAM).yaml" />
+    <param name="expected_fps" value="$(arg fps)" />
     <param name="stream_counter_rst" value="1" />
-    <param name="topic" value="cam" />
+    <param name="topic" value="image_raw" />
     <param name="frame" value="cam$(arg CAM)" />
     <param name="gstreamer_sink_for_storage" value="shmsink socket-path=/tmp/cam/$(arg CAM)_store sync=true wait-for-connection=false shm-size=10000000" />
     <param name="color_channels_src" value="1" />
-    <param name="color_channels_dst" value="1" />
+    <param name="color_channels_dst" value="3" />
     <param name="mono_as_bayer" value="0" />
     <param name="camera_parameter_ns" value="$(arg camera_parameter_ns)" />
     <rosparam ns="$(arg camera_parameter_ns)">
