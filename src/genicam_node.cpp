@@ -73,6 +73,37 @@ inline float getTimeDiff(const std::chrono::high_resolution_clock::time_point &s
 // Handle program options
 void programOptions(ros::NodeHandle &n);
 
+void loadCamera() {
+  int set_cam_params = 0;
+  int attempt_thresh = 5;
+  while (true) {
+    // Get Driver from argument
+    char driverPath[DRIVERPATHSIZE] = {0};
+    TranslateFileName("%CVB%/drivers/GenICam.vin", driverPath, DRIVERPATHSIZE);
+
+    // Load the camera via Stemmer API
+    ROS_INFO_STREAM("Load the camera driver from " << driverPath);
+    cvbbool_t success = LoadImageFile(driverPath, hCamera);
+    if (!success) {
+      ROS_ERROR_STREAM("Error loading " << driverPath << " driver!");
+      exit(1);
+    }
+    ROS_INFO_STREAM("Load " << driverPath << " successful.");
+    // access camera config
+    if (!genicam::set_camera_parameter(cameraParamter, hCamera)) {
+      set_cam_params++;
+      ROS_WARN_STREAM("+++ Camera access Error! +++ with tried attempts:" << set_cam_params);
+      ReleaseObject(hCamera);
+      usleep(1e6);
+      if (set_cam_params == attempt_thresh) {
+        ROS_WARN("Attempts reached treshold: %d. Shutdown Node.", attempt_thresh);
+        exit(-1);
+      }
+    } else {
+      break;
+    }
+  }
+}
 
 int process() {
   // Getting the address of the camera source image
@@ -186,6 +217,15 @@ int processEverything(void) {
     ROS_INFO_STREAM("G2INFO_NumBuffersLost: " << ans);
     G2GetGrabStatus(hCamera, G2INFO_NumBuffersCorrupt, ans);
     ROS_INFO_STREAM("G2INFO_NumBuffersCorrupt: " << ans);
+    if(ans > 0) {
+      ROS_WARN_STREAM("G2INFO_NumBuffersCorrupt: " << ans << ". Try to restart the camera.");
+      // stop the grab (kill = true: wait for ongoing frame acquisition to stop)
+      G2Freeze(hCamera, true);
+      // free camera
+      ReleaseObject(hCamera);
+
+      loadCamera();
+    }
     // Try to stop and start the grabbing again
     G2Freeze(hCamera, true);
     G2Grab(hCamera);
@@ -264,35 +304,8 @@ int main(int argc, char **argv) {
   source.close();
   dest.close();
 
-  int set_cam_params = 0;
-  int attempt_thresh = 5;
-  while (true) {
-    // Get Driver from argument
-    char driverPath[DRIVERPATHSIZE] = {0};
-    TranslateFileName("%CVB%/drivers/GenICam.vin", driverPath, DRIVERPATHSIZE);
+  loadCamera();
 
-    // Load the camera via Stemmer API
-    ROS_INFO_STREAM("Load the camera driver from " << driverPath);
-    cvbbool_t success = LoadImageFile(driverPath, hCamera);
-    if (!success) {
-      ROS_ERROR_STREAM("Error loading " << driverPath << " driver!");
-      return 1;
-    }
-    ROS_INFO_STREAM("Load " << driverPath << " successful.");
-    // access camera config
-    if (!genicam::set_camera_parameter(cameraParamter, hCamera)) {
-      set_cam_params++;
-      ROS_WARN_STREAM("+++ Camera access Error! +++ with tried attempts:" << set_cam_params);
-      ReleaseObject(hCamera);
-      usleep(1e6);
-      if (set_cam_params == attempt_thresh) {
-        ROS_WARN("Attempts reached treshold: %d. Shutdown Node.", attempt_thresh);
-        exit(-1);
-      }
-    } else {
-      break;
-    }
-  }
   // Height & Width of the camera image
   IMGheight = ImageHeight(hCamera);
   IMGwidth = ImageWidth(hCamera);

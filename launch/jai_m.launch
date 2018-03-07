@@ -5,10 +5,13 @@
   <arg name="CAM" default="3"/>
   <arg name="camera_parameter_ns" default="config"/>
 
+  <node name="image_proc" pkg="image_proc" type="image_proc" ns="genicam_cam$(arg CAM)"/>
+
   <node type="genicam_node" name="genicam_cam$(arg CAM)" pkg="cvb" respawn="false" output="screen">
     <param name="driverpath" value="$(find cvb)/driver/SP-5000M-GE2_$(arg CAM).ini" />
     <param name="ros_calibration" value="file://$(find cvb)/calib/jai_5000_m.yaml" />
     <param name="expected_fps" value="$(arg fps)" />
+    <param name="print_fps" value="1" />
     <param name="stream_counter_rst" value="1" />
     <param name="topic" value="image_raw" />
     <param name="frame" value="cam$(arg CAM)" />
