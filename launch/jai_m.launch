@@ -24,7 +24,7 @@
       Width: '2560'
       Height: '2048'
       PixelFormat: '17301505'
-      AcquisitionFrameRate: '20'
+      AcquisitionFrameRate: '40'
       GainSelector: '1'
       Gain: '1'
       ExposureMode: '1'
