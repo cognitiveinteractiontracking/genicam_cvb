@@ -86,7 +86,8 @@ void loadCamera() {
     cvbbool_t success = LoadImageFile(driverPath, hCamera);
     if (!success) {
       ROS_ERROR_STREAM("Error loading " << driverPath << " driver!");
-      exit(1);
+      ros::shutdown();
+      exit(0);
     }
     ROS_INFO_STREAM("Load " << driverPath << " successful.");
     // access camera config
@@ -97,7 +98,8 @@ void loadCamera() {
       usleep(1e6);
       if (set_cam_params == attempt_thresh) {
         ROS_WARN("Attempts reached treshold: %d. Shutdown Node.", attempt_thresh);
-        exit(-1);
+        ros::shutdown();
+        exit(0);
       }
     } else {
       break;
@@ -218,13 +220,14 @@ int processEverything(void) {
     G2GetGrabStatus(hCamera, G2INFO_NumBuffersCorrupt, ans);
     ROS_INFO_STREAM("G2INFO_NumBuffersCorrupt: " << ans);
     if(ans > 0) {
-      ROS_WARN_STREAM("G2INFO_NumBuffersCorrupt: " << ans << ". Try to restart the camera.");
+      ROS_WARN_STREAM("G2INFO_NumBuffersCorrupt: " << ans << ". Shutdown node.");
       // stop the grab (kill = true: wait for ongoing frame acquisition to stop)
       G2Freeze(hCamera, true);
       // free camera
       ReleaseObject(hCamera);
 
-      loadCamera();
+      ros::shutdown();
+      exit(0);
     }
     // Try to stop and start the grabbing again
     G2Freeze(hCamera, true);
