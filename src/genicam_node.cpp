@@ -37,6 +37,7 @@ static int printFps = false;
 static std::string cameraParamterPrefix;
 static std::vector<std::pair<std::string, std::string>> cameraParamter;
 static std::string rosCalbirationFile;
+static int triggerMode;
 
 // ROS send parameters
 static std::string topic;
@@ -144,6 +145,7 @@ int process() {
       if (frameDst->channels() == 3) {
           msgImage.encoding = sensor_msgs::image_encodings::RGB8;
       } else { // (frameDst->channels() == 3)
+//          msgImage.encoding = sensor_msgs::image_encodings::BAYER_GRBG8;
           msgImage.encoding = sensor_msgs::image_encodings::MONO8;
       }
 
@@ -203,6 +205,8 @@ int processEverything(void) {
     double ans;
     G2GetGrabStatus(hCamera, GRAB_INFO_GRAB_ACTIVE, ans);
     ROS_INFO_STREAM("GRAB_INFO_GRAB_ACTIVE: " << ans);
+    if(triggerMode)
+      ROS_WARN("TriggerMode is active. Wait for trigger.");
 //    while(ans == 0) {
 //      genicam::access_bool("AcquisitionStop", true, hCamera);
 //      ROS_INFO("AcquisitionStop");
@@ -260,6 +264,7 @@ void programOptions(ros::NodeHandle &n) {
   n.param<std::string>("frame", frame_id, ""); // Frame id of the camera
   n.param<std::string>("camera_paramter_prefix", cameraParamterPrefix, "config"); // JSON Object with camera parameter
   n.param<std::string>("ros_calibration", rosCalbirationFile, ""); // Path to ros calibration.yaml file
+  n.param<int>("trigger_mode", triggerMode, 0); // TriggerMode
 
   // Load the parameter for the camera
   // Get the full namespace for the camera config
@@ -279,6 +284,15 @@ void programOptions(ros::NodeHandle &n) {
         ROS_INFO_STREAM( "Load : " << key << " with value " << value);
     }
   }
+  cameraParamter.push_back(std::make_pair("AcquisitionFrameRate", to_string(expectedFps)));
+  if(triggerMode) {
+    cameraParamter.push_back(std::make_pair("TriggerSelector", "2"));
+    cameraParamter.push_back(std::make_pair("TriggerMode", "1"));
+    cameraParamter.push_back(std::make_pair("TriggerActivation", "0"));
+    cameraParamter.push_back(std::make_pair("TriggerSource", "21")); // 21 for Line5 - In (Jai Spark)
+  } else {
+    cameraParamter.push_back(std::make_pair("TriggerMode", "0"));
+  }
 
   msgImage.header.frame_id = frame_id;
 }
@@ -292,7 +306,7 @@ int main(int argc, char **argv) {
   if (!monoAsBayer) {
     imagePublisher = n.advertise<sensor_msgs::Image>(topic, 2);
   } else if (monoAsBayer && colorChannelsSrc == 1 && colorChannelsDst == 1 ) {
-    imagePublisher = n.advertise<sensor_msgs::Image>(topic + std::string("/bayer"), 2);
+    imagePublisher = n.advertise<sensor_msgs::Image>(topic/* + std::string("/bayer")*/, 2);
   } else {
     ROS_ERROR("(mono_as_bayer && color_channels_src == 1 && color_channels_dst == 1) || !monoAsBayer");
     return 1;
