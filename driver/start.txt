@@ -1,0 +1,5 @@
+# cameraCalibration
+
+This folder contains the ini files, so that the Stemmer API knows how to handle the TWB cameras.
+The files GenICam1-4.ini belong to the TWB server.
+The prefixed files belong to private setups.
