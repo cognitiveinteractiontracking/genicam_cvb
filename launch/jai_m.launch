@@ -2,7 +2,7 @@
 <launch>
 
   <arg name="fps" default="20"/>
-  <arg name="CAM" default="4"/>
+  <arg name="CAM" default="3"/>
   <arg name="camera_parameter_ns" default="config"/>
 
   <node name="image_proc" pkg="image_proc" type="image_proc" ns="genicam_cam$(arg CAM)"/>

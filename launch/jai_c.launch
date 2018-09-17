@@ -19,6 +19,7 @@
     <param name="color_channels_src" value="3"/>
     <param name="color_channels_dst" value="3"/>
     <param name="mono_as_bayer" value="0"/>
+
     <param name="trigger_mode" value="0"/>
     <param name="camera_parameter_ns" value="$(arg camera_parameter_ns)"/>
     <rosparam ns="$(arg camera_parameter_ns)">
