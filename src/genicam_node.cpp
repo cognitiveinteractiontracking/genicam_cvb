@@ -38,6 +38,7 @@ static std::string cameraParamterPrefix;
 static std::vector<std::pair<std::string, std::string>> cameraParamter;
 static std::string rosCalbirationFile;
 static int triggerMode;
+static int ptpTimeSync;
 
 // ROS send parameters
 static std::string topic;
@@ -152,7 +153,33 @@ int process() {
       msgImage.height = IMGheight;
       msgImage.width = IMGwidth;
       msgImage.is_bigendian = false;
-      msgImage.header.stamp = ros::Time::now();
+
+      double camTimestamp;
+      G2GetGrabStatus(hCamera, GRAB_INFO_TIMESTAMP, camTimestamp);
+      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP: " << std::fixed << camTimestamp);
+      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP/1000000000: " << std::fixed << camTimestamp/1000000000.0);
+      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP/2^30: " << std::fixed <<       camTimestamp/1073741824.0);
+      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP/2^31: " << std::fixed <<       camTimestamp/2147483648.0);
+      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP/2^32: " << std::fixed <<       camTimestamp/4294967296.0);
+      long long camTimestamp_long = (long long)(camTimestamp);
+      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP: " << camTimestamp_long);
+      msgImage.header.stamp = ros::Time(uint32_t(camTimestamp_long >> 32), uint32_t((camTimestamp_long << 32) >> 32));
+//        time_t secondsSinceEpoch = floor(long int(camTimestamp));
+//        boost::posix_time::ptime boost_time = boost::posix_time::from_time_t(secondsSinceEpoch);
+//        ros::Time::fromNSec(camTimestamp);
+//        ros::Time time = ros::Time(uint32_t(camTimestamp >> 32), uint32_t((camTimestamp << 32) >> 32));
+//        msgImage.header.stamp = time;
+      ROS_INFO_STREAM("Cam Time in Ros:" << msgImage.header.stamp << "\t Ros Time now:" << ros::Time::now());
+      ROS_INFO_STREAM("Difference:" << std::fixed << (ros::Time::now().toSec() - camTimestamp/1000000000.0));
+      ROS_INFO_STREAM("Difference (2^30):" << std::fixed << (ros::Time::now().toSec() - camTimestamp/1073741824.0));
+      ROS_INFO_STREAM("Difference (2^31):" << std::fixed << (ros::Time::now().toSec() - camTimestamp/2147483648.0));
+      ROS_INFO_STREAM("Difference (2^32):" << std::fixed << (ros::Time::now().toSec() - camTimestamp/4294967296.0));
+      ROS_INFO_STREAM("\n");
+      if(ptpTimeSync) {
+        // TODO Timestamp sending
+      } else {
+        msgImage.header.stamp = ros::Time::now();
+      }
       msgCameraInfo.header.stamp = msgImage.header.stamp;
       msgImage.data.resize(IMGheight * IMGwidth * frameDst->channels());
       msgImage.step = IMGwidth * frameDst->channels();
@@ -199,6 +226,10 @@ int processEverything(void) {
   // Wait for next image to be acquired
   // (returns immediately if unprocessed image are in the ring buffer)
   cvbres_t result = G2Wait(hCamera);
+
+//  double ans1;
+//  G2GetGrabStatus(hCamera, GRAB_INFO_TIMESTAMP, ans1);
+//  ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP: " << ans1);
 
   if (result < 0) {
     ROS_INFO_STREAM("Error with G2Wait");
@@ -265,6 +296,7 @@ void programOptions(ros::NodeHandle &n) {
   n.param<std::string>("camera_paramter_prefix", cameraParamterPrefix, "config"); // JSON Object with camera parameter
   n.param<std::string>("ros_calibration", rosCalbirationFile, ""); // Path to ros calibration.yaml file
   n.param<int>("trigger_mode", triggerMode, 0); // TriggerMode
+  n.param<int>("ptp_time_sync", ptpTimeSync, 1); // use ptp to time synchronization
 
   // Load the parameter for the camera
   // Get the full namespace for the camera config
@@ -292,6 +324,11 @@ void programOptions(ros::NodeHandle &n) {
     cameraParamter.push_back(std::make_pair("TriggerSource", "21")); // 21 for Line5 - In (Jai Spark)
   } else {
     cameraParamter.push_back(std::make_pair("TriggerMode", "0"));
+  }
+  if(ptpTimeSync) {
+    cameraParamter.push_back(std::make_pair("GevIEEE1588", "1"));
+  } else {
+    cameraParamter.push_back(std::make_pair("GevIEEE1588", "0"));
   }
 
   msgImage.header.frame_id = frame_id;
@@ -357,6 +394,8 @@ int main(int argc, char **argv) {
 //  msgCameraInfo.roi.height = genicam::read_int("Height", hCamera);
 //  msgCameraInfo.roi.x_offset = genicam::read_int("OffsetX", hCamera);
 //  msgCameraInfo.roi.y_offset = genicam::read_int("OffsetY", hCamera);
+
+//  ROS_INFO_STREAM(genicam::get_all_camera_properties());
 
   while (true) {
     if (processEverything() != 0) {
