@@ -5,9 +5,9 @@
   <arg name="CAM" default="4"/>
   <arg name="camera_parameter_ns" default="config"/>
 
-  <node type="genicam_node" name="genicam_cam$(arg CAM)" pkg="cvb" respawn="false" output="screen">
-    <param name="driverpath" value="$(find cvb)/driver/IPX-1M48-VC_$(arg CAM).ini" />
-    <param name="ros_calibration" value="file://$(find cvb)/calib/imperx_$(arg CAM).yaml" />
+  <node type="genicam_node" name="genicam_cam$(arg CAM)" pkg="genicam_cvb" respawn="false" output="screen">
+    <param name="driverpath" value="$(find genicam_cvb)/driver/IPX-1M48-VC_$(arg CAM).ini" />
+    <param name="ros_calibration" value="file://$(find genicam_cvb)/calib/imperx_$(arg CAM).yaml" />
     <param name="expected_fps" value="$(arg fps)" />
     <param name="stream_counter_rst" value="1" />
     <param name="topic" value="image_raw" />

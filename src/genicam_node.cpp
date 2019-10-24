@@ -89,7 +89,7 @@ void loadCamera() {
     if (!success) {
       ROS_ERROR_STREAM("Error loading " << driverPath << " driver!");
       ros::shutdown();
-      exit(0);
+      exit(-1);
     }
     ROS_INFO_STREAM("Load " << driverPath << " successful.");
     // access camera config
@@ -101,7 +101,7 @@ void loadCamera() {
       if (set_cam_params == attempt_thresh) {
         ROS_WARN("Attempts reached treshold: %d. Shutdown Node.", attempt_thresh);
         ros::shutdown();
-        exit(0);
+        exit(-1);
       }
     } else {
       break;
@@ -179,6 +179,8 @@ int process() {
         // TODO Timestamp sending
       } else {
         msgImage.header.stamp = ros::Time::now();
+        // TODO DELETE
+        //msgImage.header.stamp = ros::Time(camTimestamp/1000000000.0);
       }
       msgCameraInfo.header.stamp = msgImage.header.stamp;
       msgImage.data.resize(IMGheight * IMGwidth * frameDst->channels());
@@ -262,16 +264,16 @@ int processEverything(void) {
       ReleaseObject(hCamera);
 
       ros::shutdown();
-      exit(0);
+      exit(-1);
     }
     // Try to stop and start the grabbing again
     G2Freeze(hCamera, true);
     G2Grab(hCamera);
-  } else {
-    // Grab the image and copy it to the variable frame
-    return process();
   }
-  return 0;
+
+  // Grab the image and copy it to the variable frame
+  return process();
+
 }
 
 inline float getTimeDiff(const std::chrono::high_resolution_clock::time_point &start,
@@ -295,8 +297,8 @@ void programOptions(ros::NodeHandle &n) {
   n.param<std::string>("frame", frame_id, ""); // Frame id of the camera
   n.param<std::string>("camera_paramter_prefix", cameraParamterPrefix, "config"); // JSON Object with camera parameter
   n.param<std::string>("ros_calibration", rosCalbirationFile, ""); // Path to ros calibration.yaml file
-  n.param<int>("trigger_mode", triggerMode, 0); // TriggerMode
-  n.param<int>("ptp_time_sync", ptpTimeSync, 1); // use ptp to time synchronization
+  n.param<int>("trigger_mode", triggerMode, 1); // TriggerMode
+  n.param<int>("ptp_time_sync", ptpTimeSync, 0); // use ptp to time synchronization
 
   // Load the parameter for the camera
   // Get the full namespace for the camera config
@@ -411,7 +413,8 @@ int main(int argc, char **argv) {
   // free camera
   ReleaseObject(hCamera);
 
-  return 0;
+  // this state should actually never be reached, so we return an error code
+  return -1;
 }
 
 

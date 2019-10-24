@@ -3,13 +3,16 @@
 
   <arg name="fps" default="10"/>
   <arg name="CAM" default="5"/>
+  <arg name="trigger_mode" default="0"/>
+  <arg name="ptp_time_sync" default="0"/>
   <arg name="camera_parameter_ns" default="config"/>
-
+  
   <node name="image_proc" pkg="image_proc" type="image_proc" ns="genicam_cam$(arg CAM)"/>
 
-  <node type="genicam_node" name="genicam_cam$(arg CAM)" pkg="cvb" respawn="true" respawn_delay="10" output="screen">
-    <param name="driverpath" value="$(find cvb)/driver/SP-5000C-GE2_$(arg CAM).ini"/>
-    <param name="ros_calibration" value="file://$(find cvb)/calib/jai_5000_c.yaml"/>
+  <node type="genicam_node" name="genicam_cam$(arg CAM)" pkg="genicam_cvb" respawn="true" output="screen">
+    <param name="capability_group" value="genicam_cam$(arg CAM)/"/>
+    <param name="driverpath" value="$(find genicam_cvb)/driver/SP-5000C-GE2_$(arg CAM).ini"/>
+    <param name="ros_calibration" value="file://$(find genicam_cvb)/calib/jai_5000_c.yaml"/>
     <param name="expected_fps" value="$(arg fps)"/>
     <param name="print_fps" value="1"/>
     <param name="stream_counter_rst" value="1"/>
@@ -20,8 +23,8 @@
     <param name="color_channels_dst" value="3"/>
     <param name="mono_as_bayer" value="0"/>
 
-    <param name="trigger_mode" value="0"/>
-    <param name="ptp_time_sync" value="1"/>
+    <param name="trigger_mode" value="$(arg trigger_mode)"/>
+    <param name="ptp_time_sync" value="$(arg ptp_time_sync)"/>
     <param name="camera_parameter_ns" value="$(arg camera_parameter_ns)"/>
     <rosparam ns="$(arg camera_parameter_ns)">
       Width: '2560'
