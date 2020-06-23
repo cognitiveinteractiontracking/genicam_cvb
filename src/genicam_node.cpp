@@ -38,7 +38,7 @@ static std::string cameraParamterPrefix;
 static std::vector<std::pair<std::string, std::string>> cameraParamter;
 static std::string rosCalbirationFile;
 static int triggerMode;
-static int ptpTimeSync;
+static int ptpTimestamp;
 
 // ROS send parameters
 static std::string topic;
@@ -123,6 +123,7 @@ int process() {
   ROS_DEBUG_STREAM("(lXInc, lYInc): " << lXInc << " " << lYInc);
   // Copy the frame out of the ring buffer
   if (lpBaseAddress != 0) {
+    ros::Time systemTimestamp = ros::Time::now();
     memcpy(&frame.at<char>(0), (char*) lpBaseAddress, IMGwidth * IMGheight * colorChannelsSrc);
     // Color conversion
     if (colorChannelsSrc == 1 && colorChannelsSrc != colorChannelsDst && colorChannelsDst == 3) {
@@ -154,43 +155,30 @@ int process() {
       msgImage.width = IMGwidth;
       msgImage.is_bigendian = false;
 
-      double camTimestamp;
-      G2GetGrabStatus(hCamera, GRAB_INFO_TIMESTAMP, camTimestamp);
-      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP: " << std::fixed << camTimestamp);
-      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP/1000000000: " << std::fixed << camTimestamp/1000000000.0);
-      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP/2^30: " << std::fixed <<       camTimestamp/1073741824.0);
-      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP/2^31: " << std::fixed <<       camTimestamp/2147483648.0);
-      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP/2^32: " << std::fixed <<       camTimestamp/4294967296.0);
-      long long camTimestamp_long = (long long)(camTimestamp);
-      ROS_INFO_STREAM("GRAB_INFO_TIMESTAMP: " << camTimestamp_long);
-      msgImage.header.stamp = ros::Time(uint32_t(camTimestamp_long >> 32), uint32_t((camTimestamp_long << 32) >> 32));
-//        time_t secondsSinceEpoch = floor(long int(camTimestamp));
-//        boost::posix_time::ptime boost_time = boost::posix_time::from_time_t(secondsSinceEpoch);
-//        ros::Time::fromNSec(camTimestamp);
-//        ros::Time time = ros::Time(uint32_t(camTimestamp >> 32), uint32_t((camTimestamp << 32) >> 32));
-//        msgImage.header.stamp = time;
-      ROS_INFO_STREAM("Cam Time in Ros:" << msgImage.header.stamp << "\t Ros Time now:" << ros::Time::now());
-      ROS_INFO_STREAM("Difference:" << std::fixed << (ros::Time::now().toSec() - camTimestamp/1000000000.0));
-      ROS_INFO_STREAM("Difference (2^30):" << std::fixed << (ros::Time::now().toSec() - camTimestamp/1073741824.0));
-      ROS_INFO_STREAM("Difference (2^31):" << std::fixed << (ros::Time::now().toSec() - camTimestamp/2147483648.0));
-      ROS_INFO_STREAM("Difference (2^32):" << std::fixed << (ros::Time::now().toSec() - camTimestamp/4294967296.0));
-      ROS_INFO_STREAM("\n");
-      if(ptpTimeSync) {
-        // TODO Timestamp sending
+      
+      ROS_INFO_STREAM("------------------ TIME ANALYSIS START");
+      double systemTimestampDouble = systemTimestamp.toSec();
+      double camTimestampDouble_nsec;
+      G2GetGrabStatus(hCamera, GRAB_INFO_TIMESTAMP, camTimestampDouble_nsec);
+      double camTimestampDouble = camTimestampDouble_nsec / 1000000000;
+      ROS_INFO_STREAM("Camera timestamp: " << std::fixed << camTimestampDouble);
+      ROS_INFO_STREAM("System timestamp: " << std::fixed << systemTimestampDouble);
+      ROS_INFO_STREAM("Difference (cam vs. system timestamp):" << std::fixed << (systemTimestampDouble - camTimestampDouble));
+      
+      // Fill the header and data
+      if(ptpTimestamp) {
+        msgImage.header.stamp.fromSec(camTimestampDouble);
       } else {
-        msgImage.header.stamp = ros::Time::now();
-        // TODO DELETE
-        //msgImage.header.stamp = ros::Time(camTimestamp/1000000000.0);
+        msgImage.header.stamp = systemTimestamp;
       }
+      ROS_INFO_STREAM("Final header timestamp: " << std::fixed << msgImage.header.stamp.toSec());
+      ROS_INFO_STREAM("------------------ TIME ANALYSIS STOP");
       msgCameraInfo.header.stamp = msgImage.header.stamp;
       msgImage.data.resize(IMGheight * IMGwidth * frameDst->channels());
       msgImage.step = IMGwidth * frameDst->channels();
-//      for (int idx = 0; idx < IMGwidth * IMGheight; ++idx) {
-//          const int xIdx = idx / IMGwidth;
-//          const int yIdx = idx % IMGwidth;
-//          memcpy(msgImage.data.data() + (yIdx * IMGwidth + xIdx), frameDst->data + idx, 1);
-//      }
       memcpy(msgImage.data.data(), frameDst->data, IMGheight * IMGwidth * frameDst->channels());
+      
+      // Publishe info and frame
       imagePublisher.publish(msgImage);
       cameraInfoPublisher.publish(msgCameraInfo);
 
@@ -298,7 +286,7 @@ void programOptions(ros::NodeHandle &n) {
   n.param<std::string>("camera_paramter_prefix", cameraParamterPrefix, "config"); // JSON Object with camera parameter
   n.param<std::string>("ros_calibration", rosCalbirationFile, ""); // Path to ros calibration.yaml file
   n.param<int>("trigger_mode", triggerMode, 1); // TriggerMode
-  n.param<int>("ptp_time_sync", ptpTimeSync, 0); // use ptp to time synchronization
+  n.param<int>("ptp_timestamp", ptpTimestamp, 0); // use ptp to set the timestamp
 
   // Load the parameter for the camera
   // Get the full namespace for the camera config
@@ -327,12 +315,6 @@ void programOptions(ros::NodeHandle &n) {
   } else {
     cameraParamter.push_back(std::make_pair("TriggerMode", "0"));
   }
-  if(ptpTimeSync) {
-    cameraParamter.push_back(std::make_pair("GevIEEE1588", "1"));
-  } else {
-    cameraParamter.push_back(std::make_pair("GevIEEE1588", "0"));
-  }
-
   msgImage.header.frame_id = frame_id;
 }
 
@@ -399,7 +381,7 @@ int main(int argc, char **argv) {
 
 //  ROS_INFO_STREAM(genicam::get_all_camera_properties());
 
-  while (true) {
+  while (ros::ok()) {
     if (processEverything() != 0) {
       break;
     }
@@ -414,7 +396,7 @@ int main(int argc, char **argv) {
   ReleaseObject(hCamera);
 
   // this state should actually never be reached, so we return an error code
-  return -1;
+  return 0;
 }
 
 

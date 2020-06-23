@@ -4,7 +4,7 @@
   <arg name="fps" default="20"/>
   <arg name="CAM" default="3"/>
   <arg name="trigger_mode" default="0"/>
-  <arg name="ptp_time_sync" default="0"/>
+  <arg name="ptp_timestamp" default="0"/>
   <arg name="camera_parameter_ns" default="config"/>
 
 
@@ -12,6 +12,9 @@
 
   <node type="genicam_node" name="genicam_cam$(arg CAM)" pkg="genicam_cvb" respawn="true" respawn_delay="10" output="screen">
     <param name="capability_group" value="genicam_cam$(arg CAM)/"/>
+    <param name="respawn/max" value="10" />
+    <param name="respawn/min_runtime" value="60" />
+    <param name="respawn/delay" value="2" />
     <param name="driverpath" value="$(find genicam_cvb)/driver/SP-5000M-GE2_$(arg CAM).ini"/>
     <param name="ros_calibration" value="file://$(find genicam_cvb)/calib/jai_5000_m.yaml"/>
     <param name="expected_fps" value="$(arg fps)"/>
@@ -24,7 +27,7 @@
     <param name="color_channels_dst" value="1"/>
     <param name="mono_as_bayer" value="0"/>
     <param name="trigger_mode" value="$(arg trigger_mode)"/>
-    <param name="ptp_time_sync" value="$(arg ptp_time_sync)"/>
+    <param name="ptp_timestamp" value="$(arg ptp_timestamp)"/>
     <param name="camera_parameter_ns" value="$(arg camera_parameter_ns)"/>
     <rosparam ns="$(arg camera_parameter_ns)">
       Width: '2560'
@@ -36,6 +39,7 @@
       ExposureTime: '17000'
       HighDynamicRangeMode: '0'
       HighDynamicRangeSlope: '2'
+      GevIEEE1588: '1'
     </rosparam>
   </node>
 
