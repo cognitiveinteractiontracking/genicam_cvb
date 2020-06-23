@@ -164,7 +164,7 @@ int process() {
       double camTimestampDouble = camTimestampDouble_nsec / 1000000000;
       ROS_INFO_STREAM("Camera timestamp: " << std::fixed << camTimestampDouble);
       ROS_INFO_STREAM("System timestamp: " << std::fixed << systemTimestampDouble);
-      ROS_INFO_STREAM("Difference (cam vs. system timestamp):" << std::fixed << (systemTimestampDouble - camTimestampDouble));
+      ROS_INFO_STREAM("Difference (cam vs. system timestamp): " << std::fixed << (systemTimestampDouble - camTimestampDouble));
       
       // Fill the header and data
       if(ptpTimestamp) {
