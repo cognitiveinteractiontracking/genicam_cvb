@@ -159,6 +159,7 @@ int process() {
       ROS_INFO_STREAM("------------------ TIME ANALYSIS START");
       double systemTimestampDouble = systemTimestamp.toSec();
       double camTimestampDouble_nsec;
+      // Get the timestamp as explained in https://help.commonvisionblox.com/GenICam-User-Guide/html_english_genicam_get_image_timestamps.htm
       G2GetGrabStatus(hCamera, GRAB_INFO_TIMESTAMP, camTimestampDouble_nsec);
       double camTimestampDouble = camTimestampDouble_nsec / 1000000000;
       ROS_INFO_STREAM("Camera timestamp: " << std::fixed << camTimestampDouble);
