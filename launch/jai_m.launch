@@ -2,15 +2,15 @@
 <launch>
 
   <arg name="fps" default="20"/>
-  <arg name="CAM" default="3"/>
+  <arg name="CAM" default="2"/>
   <arg name="trigger_mode" default="0"/>
-  <arg name="ptp_timestamp" default="0"/>
+  <arg name="ptp_timestamp" default="1"/>
   <arg name="camera_parameter_ns" default="config"/>
 
 
   <node name="image_proc" pkg="image_proc" type="image_proc" ns="genicam_cam$(arg CAM)"/>
 
-  <node type="genicam_node" name="genicam_cam$(arg CAM)" pkg="genicam_cvb" respawn="true" respawn_delay="10" output="screen">
+  <node type="genicam_node" name="genicam_cam$(arg CAM)" pkg="genicam_cvb" respawn="true" respawn_delay="10" output="screen" clear_params="true">
     <param name="capability_group" value="genicam_cam$(arg CAM)/"/>
     <param name="respawn/max" value="10" />
     <param name="respawn/min_runtime" value="60" />
@@ -22,7 +22,6 @@
     <param name="stream_counter_rst" value="1"/>
     <param name="topic" value="image_raw"/>
     <param name="frame" value="cam$(arg CAM)"/>
-    <param name="gstreamer_sink_for_storage" value="shmsink socket-path=/tmp/cam/jai_$(arg CAM)_store sync=true wait-for-connection=false shm-size=10000000"/>
     <param name="color_channels_src" value="1"/>
     <param name="color_channels_dst" value="1"/>
     <param name="mono_as_bayer" value="0"/>
