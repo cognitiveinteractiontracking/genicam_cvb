@@ -156,15 +156,15 @@ int process() {
       msgImage.is_bigendian = false;
 
       
-      ROS_INFO_STREAM("------------------ TIME ANALYSIS START");
+      ROS_DEBUG_STREAM("------------------ TIME ANALYSIS START");
       double systemTimestampDouble = systemTimestamp.toSec();
       double camTimestampDouble_nsec;
       // Get the timestamp as explained in https://help.commonvisionblox.com/GenICam-User-Guide/html_english_genicam_get_image_timestamps.htm
       G2GetGrabStatus(hCamera, GRAB_INFO_TIMESTAMP, camTimestampDouble_nsec);
       double camTimestampDouble = camTimestampDouble_nsec / 1000000000;
-      ROS_INFO_STREAM("Camera timestamp: " << std::fixed << camTimestampDouble);
-      ROS_INFO_STREAM("System timestamp: " << std::fixed << systemTimestampDouble);
-      ROS_INFO_STREAM("Difference (cam vs. system timestamp): " << std::fixed << (systemTimestampDouble - camTimestampDouble));
+      ROS_DEBUG_STREAM("Camera timestamp: " << std::fixed << camTimestampDouble);
+      ROS_DEBUG_STREAM("System timestamp: " << std::fixed << systemTimestampDouble);
+      ROS_DEBUG_STREAM("Difference (cam vs. system timestamp): " << std::fixed << (systemTimestampDouble - camTimestampDouble));
       
       // Fill the header and data
       if(ptpTimestamp) {
@@ -172,8 +172,8 @@ int process() {
       } else {
         msgImage.header.stamp = systemTimestamp;
       }
-      ROS_INFO_STREAM("Final header timestamp: " << std::fixed << msgImage.header.stamp.toSec());
-      ROS_INFO_STREAM("------------------ TIME ANALYSIS STOP");
+      ROS_DEBUG_STREAM("Final header timestamp: " << std::fixed << msgImage.header.stamp.toSec());
+      ROS_DEBUG_STREAM("------------------ TIME ANALYSIS STOP");
       msgCameraInfo.header.stamp = msgImage.header.stamp;
       msgImage.data.resize(IMGheight * IMGwidth * frameDst->channels());
       msgImage.step = IMGwidth * frameDst->channels();
@@ -202,7 +202,7 @@ int process() {
   if (printFps) {
     float timeDiff;
     if ((timeDiff = getTimeDiff(timeStamp, std::chrono::high_resolution_clock::now())) > 1.0f) {
-      ROS_INFO_STREAM("FPS to gstreamer: " << fpsStreamCounter / timeDiff);
+      ROS_INFO_STREAM("FPS to publish: " << fpsStreamCounter / timeDiff);
       ROS_INFO_STREAM("FPS from camera: " << fpsCounter / timeDiff);
       fpsCounter = 0;
       fpsStreamCounter = 0;
