@@ -53,6 +53,7 @@ sensor_msgs::CameraInfo msgCameraInfo;
 cv::Mat img;
 
 static std::string driverpath = "";
+static std::string driverpathBasename = "";
 const std::string cvbDriverPath("/etc/opt/cvb/drivers/GenICam.ini");
 
 // FPS calculation
@@ -179,7 +180,7 @@ int process() {
       msgImage.step = IMGwidth * frameDst->channels();
       memcpy(msgImage.data.data(), frameDst->data, IMGheight * IMGwidth * frameDst->channels());
       
-      // Publishe info and frame
+      // Publish info and frame
       imagePublisher.publish(msgImage);
       cameraInfoPublisher.publish(msgCameraInfo);
 
@@ -202,8 +203,8 @@ int process() {
   if (printFps) {
     float timeDiff;
     if ((timeDiff = getTimeDiff(timeStamp, std::chrono::high_resolution_clock::now())) > 1.0f) {
-      ROS_INFO_STREAM("FPS to publish: " << fpsStreamCounter / timeDiff);
-      ROS_INFO_STREAM("FPS from camera: " << fpsCounter / timeDiff);
+      ROS_INFO_STREAM("FPS to publish on " << ros::NodeHandle("~").getNamespace() << "/" << topic << " : " << fpsStreamCounter / timeDiff);
+      ROS_INFO_STREAM("FPS from camera " << driverpathBasename << " : " << fpsCounter / timeDiff);
       fpsCounter = 0;
       fpsStreamCounter = 0;
       timeStamp = std::chrono::high_resolution_clock::now();
@@ -281,7 +282,7 @@ void programOptions(ros::NodeHandle &n) {
   n.param<int>("color_channels_dst", colorChannelsDst, 3); // Number of channels to send via ROS
   n.param<int>("mono_as_bayer", monoAsBayer, 0); // Sends mono images as bayer pattern
   n.param<int>("gui", gui, 0); // Show the rectified image by OpenCV
-  n.param<int>("expected_fps", expectedFps, 1); // Expected FPS (Needed by gstreamer)
+  n.param<int>("expected_fps", expectedFps, 1); // Expected FPS
   n.param<std::string>("topic", topic, ""); // Topic to send the images
   n.param<std::string>("frame", frame_id, ""); // Frame id of the camera
   n.param<std::string>("camera_paramter_prefix", cameraParamterPrefix, "config"); // JSON Object with camera parameter
@@ -336,6 +337,7 @@ int main(int argc, char **argv) {
   cameraInfoPublisher = n.advertise<sensor_msgs::CameraInfo>("camera_info", 1);
 
   // Copy the driver
+  driverpathBasename = driverpath.substr(driverpath.find_last_of("/\\")+1);
   ROS_INFO_STREAM("Copy " << driverpath << " to " << cvbDriverPath);
   std::ifstream source(driverpath, std::ios::binary);
   std::ofstream dest(cvbDriverPath, std::ios::binary);
