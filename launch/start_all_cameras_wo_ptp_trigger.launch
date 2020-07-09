@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<launch>
+
+  <!--start the cameras w/o PTP and trigger for e.g. testing or calibration-->
+  <include file="$(find genicam_cvb)/launch/jai_m.launch">
+    <arg name="CAM" value="1" />
+    <arg name="trigger_mode" value="0" />
+    <arg name="ptp_timestamp" value="0" />
+    <arg name="fps" value="10" />
+  </include>
+  <include file="$(find genicam_cvb)/launch/jai_m.launch">
+    <arg name="CAM" value="2" />
+    <arg name="trigger_mode" value="0" />
+    <arg name="ptp_timestamp" value="0" />
+    <arg name="fps" value="10" />
+  </include>
+  <include file="$(find genicam_cvb)/launch/jai_m.launch">
+    <arg name="CAM" value="3" />
+    <arg name="trigger_mode" value="0" />
+    <arg name="ptp_timestamp" value="0" />
+    <arg name="fps" value="10" />
+  </include>
+  <include file="$(find genicam_cvb)/launch/jai_m.launch">
+    <arg name="CAM" value="4" />
+    <arg name="trigger_mode" value="0" />
+    <arg name="ptp_timestamp" value="0" />
+    <arg name="fps" value="10" />
+  </include>
+  <include file="$(find genicam_cvb)/launch/jai_c.launch">
+    <arg name="CAM" value="5" />
+    <arg name="trigger_mode" value="0" />
+    <arg name="ptp_timestamp" value="0" />
+    <arg name="fps" value="5" />
+  </include>
+</launch>
